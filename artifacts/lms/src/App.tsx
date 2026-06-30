@@ -36,10 +36,17 @@ function AppRoutes() {
 
   if (!isAuthenticated) {
     return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route><Redirect to="/" /></Route>
-      </Switch>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Switch>
+            <Route path="/" component={Landing} />
+            <Route path="/courses" component={Courses} />
+            <Route path="/courses/:id" component={CourseDetail} />
+            <Route><Redirect to="/" /></Route>
+          </Switch>
+        </main>
+      </div>
     );
   }
 
