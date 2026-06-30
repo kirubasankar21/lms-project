@@ -1,0 +1,205 @@
+Build a Full Stack Learning Management System (LMS) web application as a working MVP.
+
+The application should support Students, Instructors, and Admin roles with authentication and basic learning features.
+
+🧠 PROJECT GOAL
+
+Create a simple but functional LMS where:
+
+Instructors can create courses and upload lessons
+Students can enroll, learn, take quizzes, and track progress
+Admin can manage users and courses
+
+Keep the project simple, clean, and fully runnable in Replit.
+
+⚙️ TECH STACK
+Frontend:
+React (Vite)
+React Router DOM
+Axios
+Basic CSS (no heavy UI libraries)
+Backend:
+Node.js
+Express.js
+JWT Authentication
+bcrypt for password hashing
+Database:
+PostgreSQL
+Optional Integrations (simple/mock if needed):
+Cloudinary (for video/image URLs)
+Razorpay (mock payment or test mode only)
+🧩 PROJECT STRUCTURE
+
+Create two folders:
+
+/client → React frontend
+/server → Node.js backend
+
+🔐 AUTHENTICATION SYSTEM
+Features:
+User Register/Login
+Roles: student, instructor, admin
+JWT token authentication
+Protected routes
+User Table:
+id
+name
+email
+password (hashed)
+role
+📚 CORE FEATURES
+1. COURSE MANAGEMENT (Instructor)
+Create course:
+title
+description
+price (optional)
+Add lessons:
+title
+video URL (YouTube or Cloudinary link)
+View all created courses
+2. STUDENT FEATURES
+View all courses
+Enroll in course
+Watch lessons
+Track progress (% completed lessons)
+3. QUIZ SYSTEM (Simple)
+Instructor creates MCQ quiz per course
+Fields:
+question
+options (A, B, C, D)
+correct answer
+Student attempts quiz
+Show score at end
+4. ASSIGNMENT SYSTEM
+Instructor can create assignment:
+title
+description
+Student submits:
+text answer OR file URL
+Instructor can view submissions
+5. DISCUSSION FORUM
+Each course has a comment section
+Students can:
+post messages
+reply to others
+6. PAYMENT MODULE (SIMPLIFIED)
+If course is paid:
+show “Enroll Now”
+integrate Razorpay test checkout OR simulate payment success
+If free:
+direct enrollment
+7. ADMIN DASHBOARD
+
+Admin can:
+
+View all users
+View all courses
+Delete users
+Delete courses
+🗄️ DATABASE TABLES (PostgreSQL)
+
+Create these tables:
+
+users
+id
+name
+email
+password
+role
+courses
+id
+title
+description
+instructor_id
+lessons
+id
+course_id
+title
+video_url
+enrollments
+id
+user_id
+course_id
+progress
+quizzes
+id
+course_id
+question
+option_a
+option_b
+option_c
+option_d
+correct_answer
+assignments
+id
+course_id
+title
+description
+submissions
+id
+assignment_id
+user_id
+answer
+discussions
+id
+course_id
+user_id
+message
+🌐 API REQUIREMENTS (Express)
+Auth Routes:
+POST /api/auth/register
+POST /api/auth/login
+Course Routes:
+GET /api/courses
+POST /api/courses
+GET /api/courses/:id
+Lesson Routes:
+POST /api/lessons
+GET /api/lessons/:courseId
+Enrollment:
+POST /api/enroll
+GET /api/enroll/:userId
+Quiz:
+POST /api/quiz
+GET /api/quiz/:courseId
+Assignment:
+POST /api/assignment
+POST /api/submit
+Discussion:
+POST /api/discussion
+GET /api/discussion/:courseId
+💻 FRONTEND PAGES (React)
+
+Create these pages:
+
+/login
+/register
+/dashboard (role-based)
+/courses
+/course/:id
+/create-course (instructor)
+/quiz/:courseId
+/assignment/:courseId
+/admin
+🎯 UI REQUIREMENTS
+Simple clean layout
+Navigation bar
+Role-based dashboard views
+No complex styling needed
+Focus on functionality first
+🚀 IMPORTANT RULES
+Make it fully runnable in Replit
+Use simple code structure
+Avoid unnecessary complexity
+Use mock data if needed
+Ensure backend + frontend connect properly
+Provide working API + UI integration
+🎯 FINAL OUTPUT
+
+A working LMS MVP where:
+
+Users can register/login
+Instructors create courses
+Students enroll and learn
+Quiz + assignment works
+Admin manages system

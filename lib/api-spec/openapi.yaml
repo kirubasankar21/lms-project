@@ -3,13 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Learning Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: Users
+    description: User management
+  - name: Courses
+    description: Course management
+  - name: Lessons
+    description: Lesson management
+  - name: Enrollments
+    description: Enrollment management
+  - name: Quizzes
+    description: Quiz management
+  - name: Assignments
+    description: Assignment management
+  - name: Discussions
+    description: Discussion forum
+  - name: Dashboard
+    description: Dashboard summaries and statistics
+
 paths:
   /healthz:
     get:
@@ -24,7 +43,744 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to returnTo path on success.
+
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to OIDC provider logout URL.
+
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  # ── User management ──────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [Users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [Users]
+      summary: Get a single user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteUser
+      tags: [Users]
+      summary: Delete a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /users/me/role:
+    patch:
+      operationId: updateMyRole
+      tags: [Users]
+      summary: Update the current user's role (first-time setup or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRoleUpdate"
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/role:
+    patch:
+      operationId: updateUserRole
+      tags: [Users]
+      summary: Update a user's role (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRoleUpdate"
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── Courses ──────────────────────────────────────────────────────────────────
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [Courses]
+      summary: List all courses
+      parameters:
+        - name: instructorId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      operationId: createCourse
+      tags: [Courses]
+      summary: Create a new course (instructor only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  /courses/{id}:
+    get:
+      operationId: getCourse
+      tags: [Courses]
+      summary: Get a course by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCourse
+      tags: [Courses]
+      summary: Update a course (instructor only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+    delete:
+      operationId: deleteCourse
+      tags: [Courses]
+      summary: Delete a course (instructor or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Lessons ──────────────────────────────────────────────────────────────────
+  /courses/{courseId}/lessons:
+    get:
+      operationId: listLessons
+      tags: [Lessons]
+      summary: List lessons for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lesson"
+    post:
+      operationId: createLesson
+      tags: [Lessons]
+      summary: Add a lesson to a course (instructor only)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+
+  /lessons/{id}:
+    delete:
+      operationId: deleteLesson
+      tags: [Lessons]
+      summary: Delete a lesson (instructor only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /lessons/{id}/complete:
+    post:
+      operationId: completeLesson
+      tags: [Lessons]
+      summary: Mark a lesson as completed (student)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Progress updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonProgress"
+
+  /enrollments/course/{courseId}/progress:
+    get:
+      operationId: getCourseProgress
+      tags: [Enrollments]
+      summary: Get progress for a course (current user)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Progress details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseProgress"
+
+  # ── Enrollments ───────────────────────────────────────────────────────────────
+  /enrollments:
+    get:
+      operationId: listMyEnrollments
+      tags: [Enrollments]
+      summary: List current user's enrollments
+      responses:
+        "200":
+          description: Enrollments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Enrollment"
+    post:
+      operationId: enrollInCourse
+      tags: [Enrollments]
+      summary: Enroll in a course (student)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentInput"
+      responses:
+        "201":
+          description: Enrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+
+  /enrollments/{courseId}:
+    delete:
+      operationId: unenrollFromCourse
+      tags: [Enrollments]
+      summary: Unenroll from a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Unenrolled
+
+  # ── Quizzes ──────────────────────────────────────────────────────────────────
+  /courses/{courseId}/quizzes:
+    get:
+      operationId: listQuizzes
+      tags: [Quizzes]
+      summary: List quizzes for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of quizzes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quiz"
+    post:
+      operationId: createQuiz
+      tags: [Quizzes]
+      summary: Create a quiz question (instructor only)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+
+  /courses/{courseId}/quizzes/submit:
+    post:
+      operationId: submitQuiz
+      tags: [Quizzes]
+      summary: Submit quiz answers (student)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizSubmission"
+      responses:
+        "200":
+          description: Quiz result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizResult"
+
+  /quizzes/{id}:
+    delete:
+      operationId: deleteQuiz
+      tags: [Quizzes]
+      summary: Delete a quiz question (instructor only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Assignments ───────────────────────────────────────────────────────────────
+  /courses/{courseId}/assignments:
+    get:
+      operationId: listAssignments
+      tags: [Assignments]
+      summary: List assignments for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+    post:
+      operationId: createAssignment
+      tags: [Assignments]
+      summary: Create an assignment (instructor only)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+
+  /assignments/{id}/submissions:
+    get:
+      operationId: listSubmissions
+      tags: [Assignments]
+      summary: List submissions for an assignment (instructor only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+    post:
+      operationId: submitAssignment
+      tags: [Assignments]
+      summary: Submit an assignment (student)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  # ── Discussions ────────────────────────────────────────────────────────────────
+  /courses/{courseId}/discussions:
+    get:
+      operationId: listDiscussions
+      tags: [Discussions]
+      summary: List discussion posts for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of discussion posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscussionPost"
+    post:
+      operationId: createDiscussion
+      tags: [Discussions]
+      summary: Post a message to a course discussion
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscussionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscussionPost"
+
+  /discussions/{id}:
+    delete:
+      operationId: deleteDiscussion
+      tags: [Discussions]
+      summary: Delete a discussion post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Dashboard ─────────────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [Dashboard]
+      summary: Get role-based dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [Dashboard]
+      summary: Get recent activity feed for current user
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +790,445 @@ components:
       required:
         - status
 
+    # Auth schemas
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    # Domain entities
+    User:
+      type: object
+      required: [id, replitId, name, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+        replitId:
+          type: string
+        name:
+          type: string
+        email:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+        role:
+          type: string
+          enum: [student, instructor, admin]
+        createdAt:
+          type: string
+          format: date-time
+
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [student, instructor, admin]
+
+    Course:
+      type: object
+      required: [id, title, description, instructorId, isFree, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        thumbnailUrl:
+          type: [string, 'null']
+        instructorId:
+          type: string
+        instructorName:
+          type: [string, 'null']
+        price:
+          type: [number, 'null']
+        isFree:
+          type: boolean
+        lessonCount:
+          type: integer
+        enrollmentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CourseInput:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        thumbnailUrl:
+          type: string
+        price:
+          type: number
+        isFree:
+          type: boolean
+
+    CourseUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        thumbnailUrl:
+          type: string
+        price:
+          type: number
+        isFree:
+          type: boolean
+
+    Lesson:
+      type: object
+      required: [id, courseId, title, videoUrl, orderIndex, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        videoUrl:
+          type: string
+        description:
+          type: [string, 'null']
+        orderIndex:
+          type: integer
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    LessonInput:
+      type: object
+      required: [title, videoUrl]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        videoUrl:
+          type: string
+        description:
+          type: string
+        orderIndex:
+          type: integer
+
+    LessonProgress:
+      type: object
+      required: [lessonId, completed]
+      properties:
+        lessonId:
+          type: integer
+        completed:
+          type: boolean
+
+    CourseProgress:
+      type: object
+      required: [courseId, totalLessons, completedLessons, progressPercent]
+      properties:
+        courseId:
+          type: integer
+        totalLessons:
+          type: integer
+        completedLessons:
+          type: integer
+        progressPercent:
+          type: number
+
+    Enrollment:
+      type: object
+      required: [id, userId, courseId, enrolledAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        courseId:
+          type: integer
+        courseTitle:
+          type: [string, 'null']
+        courseThumbnailUrl:
+          type: [string, 'null']
+        progressPercent:
+          type: number
+        enrolledAt:
+          type: string
+          format: date-time
+
+    EnrollmentInput:
+      type: object
+      required: [courseId]
+      properties:
+        courseId:
+          type: integer
+
+    Quiz:
+      type: object
+      required: [id, courseId, question, optionA, optionB, optionC, optionD, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        question:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    QuizInput:
+      type: object
+      required: [question, optionA, optionB, optionC, optionD, correctAnswer]
+      properties:
+        question:
+          type: string
+          minLength: 1
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctAnswer:
+          type: string
+          enum: [A, B, C, D]
+
+    QuizSubmission:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [quizId, answer]
+            properties:
+              quizId:
+                type: integer
+              answer:
+                type: string
+                enum: [A, B, C, D]
+
+    QuizResult:
+      type: object
+      required: [score, total, percentage]
+      properties:
+        score:
+          type: integer
+        total:
+          type: integer
+        percentage:
+          type: number
+
+    Assignment:
+      type: object
+      required: [id, courseId, title, description, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    AssignmentInput:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        dueDate:
+          type: string
+
+    Submission:
+      type: object
+      required: [id, assignmentId, userId, answer, submittedAt]
+      properties:
+        id:
+          type: integer
+        assignmentId:
+          type: integer
+        userId:
+          type: string
+        userName:
+          type: [string, 'null']
+        answer:
+          type: string
+        fileUrl:
+          type: [string, 'null']
+        submittedAt:
+          type: string
+          format: date-time
+
+    SubmissionInput:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
+        fileUrl:
+          type: string
+
+    DiscussionPost:
+      type: object
+      required: [id, courseId, userId, message, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        userId:
+          type: string
+        userName:
+          type: [string, 'null']
+        userAvatarUrl:
+          type: [string, 'null']
+        message:
+          type: string
+        parentId:
+          type: [integer, 'null']
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscussionPost"
+        createdAt:
+          type: string
+          format: date-time
+
+    DiscussionInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+        parentId:
+          type: integer
+
+    DashboardSummary:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+        totalCourses:
+          type: integer
+        totalEnrollments:
+          type: integer
+        totalUsers:
+          type: integer
+        totalStudents:
+          type: integer
+        totalInstructors:
+          type: integer
+        myCoursesCount:
+          type: integer
+        enrolledCoursesCount:
+          type: integer
+        completedCoursesCount:
+          type: integer
+        averageProgress:
+          type: number
+
+    ActivityItem:
+      type: object
+      required: [id, type, message, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [enrollment, completion, submission, discussion, course_created]
+        message:
+          type: string
+        courseTitle:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time

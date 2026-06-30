@@ -1,0 +1,1 @@
+- [Auth schema owns usersTable](auth-users-table.md) — Replit Auth owns `usersTable` in `auth.ts`; never re-export from other schema files or esbuild throws an ambiguous import error.

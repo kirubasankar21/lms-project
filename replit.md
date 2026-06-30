@@ -1,6 +1,6 @@
-# [Project name]
+# LearnFlow LMS
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A full-stack Learning Management System where students learn structured courses, instructors create content, and admins manage the platform.
 
 ## Run & Operate
 
@@ -9,28 +9,39 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string, `SESSION_SECRET` — cookie session secret
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- API: Express 5 with Replit Auth (OIDC + PKCE)
 - DB: PostgreSQL + Drizzle ORM
+- Frontend: React + Vite + TailwindCSS v4
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/api-spec/openapi.yaml` — source of truth for all API contracts
+- `lib/db/src/schema/auth.ts` — Replit Auth tables (sessions, users with role field)
+- `lib/db/src/schema/lms.ts` — LMS tables (courses, lessons, enrollments, progress, quizzes, assignments, submissions, discussions)
+- `artifacts/api-server/src/routes/` — all Express route handlers
+- `artifacts/lms/src/` — React frontend (pages/, components/)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Auth: Replit Auth (OIDC/PKCE). `req.user.id` = Replit user ID = primary key in `usersTable`. No custom JWT.
+- Users table lives in `auth.ts` schema (Replit Auth owns it). Added `role` column there instead of a separate LMS users table.
+- All LMS tables reference `usersTable.id` (varchar, Replit user ID) for foreign keys.
+- API contract defined first in OpenAPI YAML, then codegen generates React Query hooks and Zod schemas. Server uses Zod schemas to validate responses.
+- Frontend uses `@workspace/replit-auth-web` for `useAuth()` hook.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Students**: browse courses, enroll, watch lessons (YouTube embed), track progress, take quizzes, submit assignments, join discussions
+- **Instructors**: create courses, add lessons, create quizzes/assignments, see submissions
+- **Admins**: manage users (change roles, delete), manage all courses
 
 ## User preferences
 
@@ -38,7 +49,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- `lib/db/src/schema/auth.ts` owns `usersTable` — do NOT re-export it from `lms.ts` (causes ambiguous import build error)
+- After any schema changes: run `pnpm --filter @workspace/db run push`
+- After any OpenAPI spec changes: run `pnpm --filter @workspace/api-spec run codegen`
+- `useListCourses({ instructorId: "..." })` — query params go directly as first arg, not nested
+- `req.user.id` is the Replit user ID (stored as `usersTable.id`)
 
 ## Pointers
 
